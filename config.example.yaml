@@ -1,0 +1,28 @@
+# ==============================================================================
+# OneDrive Daemon Configuration Template
+# ==============================================================================
+# Copy this file or let ./install.sh generate it at:
+# ~/.config/onedrive_daemon/config.yaml
+
+# [REQUIRED] Full SharePoint or OneDrive web documents URL:
+# To find this:
+# 1. Sign in to your OneDrive or SharePoint portal in your web browser.
+# 2. Go to "My files" or "Documents".
+# 3. Copy the URL from your browser address bar up to "/Documents".
+# Example: https://<tenant>-my.sharepoint.com/personal/<username>_<domain>/Documents
+onedrive_url: "https://yourtenant-my.sharepoint.com/personal/youruser_domain_com/Documents"
+
+# [OPTIONAL] Name of the rclone remote entry to manage in rclone.conf (default: onedrive)
+remote_name: "onedrive"
+
+# [OPTIONAL] Local directory path where OneDrive will be mounted (default: ~/OneDrive)
+mount_point: "~/OneDrive"
+
+# [OPTIONAL] Seconds between health checks to monitor session validity (default: 900 = 15 minutes)
+check_interval_seconds: 900
+
+# [OPTIONAL] Directory for Playwright's persistent browser context (stores login cookies)
+browser_profile: "~/.config/onedrive_daemon/browser_profile"
+
+# [OPTIONAL] Path to the rclone configuration file (default: ~/.config/rclone/rclone.conf)
+rclone_conf: "~/.config/rclone/rclone.conf"

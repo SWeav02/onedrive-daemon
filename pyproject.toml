@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "onedrive-daemon"
+version = "0.1.0"
+description = "Automated SharePoint and OneDrive FUSE mount with interactive MFA/SSO refresh daemon"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "playwright>=1.40.0",
+    "pyyaml>=6.0",
+]
+
+[project.scripts]
+onedrive-daemon = "onedrive_daemon:main"

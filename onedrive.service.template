@@ -1,0 +1,20 @@
+[Unit]
+Description=Automated OneDrive / SharePoint Mount and Session Watchdog
+After=graphical-session.target network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+Environment=PYTHONUNBUFFERED=1
+PassEnvironment=DISPLAY WAYLAND_DISPLAY XAUTHORITY DBUS_SESSION_BUS_ADDRESS
+
+# Configured automatically by install.sh:
+ExecStart=@@PYTHON_PATH@@ @@DAEMON_PATH@@
+ExecStop=/usr/bin/fusermount -uz @@MOUNT_POINT@@
+
+# Automatically restart if process crashes
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=default.target
