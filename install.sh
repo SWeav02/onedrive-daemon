@@ -147,6 +147,33 @@ fi
 # ------------------------------------------------------------------------------
 # 4. Interactive Configuration Setup
 # ------------------------------------------------------------------------------
+normalize_url() {
+    local raw="$1"
+    "$VENV_PYTHON" -c "
+import re, sys
+from urllib.parse import urlparse
+raw = sys.argv[1].strip().strip('\"\'')
+raw = re.sub(r'^(?:OneDrive\s+web\s+URL\s*:\s*)', '', raw, flags=re.IGNORECASE).strip()
+parsed = urlparse(raw)
+if parsed.scheme and parsed.netloc:
+    path = parsed.path
+    match = re.match(r'^(.*?/personal/[^/?#]+)', path, re.IGNORECASE)
+    if match:
+        print(f'{parsed.scheme}://{parsed.netloc}{match.group(1).rstrip(\"/\")}/Documents')
+        sys.exit(0)
+    match_site = re.match(r'^(.*?/sites/[^/?#]+)', path, re.IGNORECASE)
+    if match_site:
+        print(f'{parsed.scheme}://{parsed.netloc}{match_site.group(1).rstrip(\"/\")}/Documents')
+        sys.exit(0)
+    clean_path = re.sub(r'/_layouts/.*$', '', path, flags=re.IGNORECASE).rstrip('/')
+    if not clean_path.endswith('/Documents'):
+        clean_path += '/Documents'
+    print(f'{parsed.scheme}://{parsed.netloc}{clean_path}')
+else:
+    print(raw)
+" "$raw"
+}
+
 echo ""
 echo "======================================================================"
 echo "                    Configuration Settings Setup                      "
@@ -181,25 +208,34 @@ CONFIRM_SETTINGS=false
 while [ "$CONFIRM_SETTINGS" = false ]; do
     echo ""
     echo "--- Step 1: OneDrive / SharePoint Web URL ---"
-    echo "Where to find your URL:"
-    echo "  1. Sign in to your OneDrive or SharePoint portal in your web browser."
-    echo "  2. Go to 'My files' or 'Documents'."
-    echo "  3. Copy the URL from your browser address bar up to '/Documents'."
-    echo "  Example: https://tenant-my.sharepoint.com/personal/username_domain_com/Documents"
+    echo "Where to find your URL in OneDrive Online:"
+    echo "  1. Log into your OneDrive Online account in your web browser."
+    echo "  2. Click the Settings gear icon (⚙) in the top-right navigation bar."
+    echo "  3. Click 'More settings' (or 'OneDrive settings' -> 'More settings')."
+    echo "  4. Scroll down and click 'Diagnostic information'."
+    echo "  5. Copy the 'OneDrive web URL' shown there, e.g.:"
+    echo "     https://<tenant>-my.sharepoint.com/personal/<user>/_layouts/15/onedrive.aspx"
+    echo ""
+    echo "  (You can paste the diagnostic link directly; the installer will automatically"
+    echo "   parse it into the required WebDAV '/Documents' endpoint)."
     echo ""
 
     if [ -n "$CURRENT_URL" ]; then
         echo "Currently stored URL: $CURRENT_URL"
         read -r -p "Enter new URL (or press [Enter] to keep current): " input_url
         if [ -n "$input_url" ]; then
-            SELECTED_URL="$input_url"
+            SELECTED_URL=$(normalize_url "$input_url")
+            echo "[+] Parsed endpoint: $SELECTED_URL"
         else
             SELECTED_URL="$CURRENT_URL"
         fi
     else
         while [ -z "$SELECTED_URL" ]; do
-            read -r -p "Enter OneDrive / SharePoint URL: " SELECTED_URL
-            if [ -z "$SELECTED_URL" ]; then
+            read -r -p "Enter OneDrive / SharePoint URL: " input_url
+            if [ -n "$input_url" ]; then
+                SELECTED_URL=$(normalize_url "$input_url")
+                echo "[+] Parsed endpoint: $SELECTED_URL"
+            else
                 echo "[-] URL cannot be empty. Please provide your SharePoint/OneDrive URL."
             fi
         done
@@ -259,6 +295,7 @@ while [ "$CONFIRM_SETTINGS" = false ]; do
         CURRENT_INTERVAL="$SELECTED_INTERVAL"
         CURRENT_PROFILE="$SELECTED_PROFILE"
         CURRENT_RCLONE="$SELECTED_RCLONE"
+        SELECTED_URL=""
         echo "[*] Returning to settings inputs..."
     elif [[ "$review_choice" =~ ^[Nn]$ ]]; then
         echo "Installation aborted by user."

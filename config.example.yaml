@@ -5,11 +5,16 @@
 # ~/.config/onedrive_daemon/config.yaml
 
 # [REQUIRED] Full SharePoint or OneDrive web documents URL:
-# To find this:
-# 1. Sign in to your OneDrive or SharePoint portal in your web browser.
-# 2. Go to "My files" or "Documents".
-# 3. Copy the URL from your browser address bar up to "/Documents".
-# Example: https://<tenant>-my.sharepoint.com/personal/<username>_<domain>/Documents
+# How to find this in OneDrive Online:
+# 1. Sign in to OneDrive Online in your web browser.
+# 2. Click the Settings gear icon (⚙) in the top-right header.
+# 3. Click 'More settings' (or 'OneDrive settings' -> 'More settings').
+# 4. Scroll down and click 'Diagnostic information'.
+# 5. Copy the 'OneDrive web URL' shown there, e.g.:
+#    https://<tenant>-my.sharepoint.com/personal/<user>/_layouts/15/onedrive.aspx
+#
+# Note: You can provide the diagnostic URL directly, or the WebDAV endpoint:
+# https://<tenant>-my.sharepoint.com/personal/<username>_<domain>/Documents
 onedrive_url: "https://yourtenant-my.sharepoint.com/personal/youruser_domain_com/Documents"
 
 # [OPTIONAL] Name of the rclone remote entry to manage in rclone.conf (default: onedrive)

@@ -20,15 +20,36 @@ CONFIGURATION:
 
 import configparser
 import os
+import re
 import signal
 import subprocess
 import sys
 import time
 from pathlib import Path
+from urllib.parse import urlparse
 import yaml
 from playwright.sync_api import sync_playwright
 
 # --- CONFIGURATION LOADER ---
+
+def normalize_onedrive_url(raw_url: str) -> str:
+    """Normalizes OneDrive/SharePoint URL (e.g. from Diagnostic Info) to WebDAV /Documents path."""
+    raw = raw_url.strip().strip('"\'')
+    raw = re.sub(r'^(?:OneDrive\s+web\s+URL\s*:\s*)', '', raw, flags=re.IGNORECASE).strip()
+    parsed = urlparse(raw)
+    if parsed.scheme and parsed.netloc:
+        path = parsed.path
+        match = re.match(r'^(.*?/personal/[^/?#]+)', path, re.IGNORECASE)
+        if match:
+            return f"{parsed.scheme}://{parsed.netloc}{match.group(1).rstrip('/')}/Documents"
+        match_site = re.match(r'^(.*?/sites/[^/?#]+)', path, re.IGNORECASE)
+        if match_site:
+            return f"{parsed.scheme}://{parsed.netloc}{match_site.group(1).rstrip('/')}/Documents"
+        clean_path = re.sub(r'/_layouts/.*$', '', path, flags=re.IGNORECASE).rstrip('/')
+        if not clean_path.endswith('/Documents'):
+            clean_path += '/Documents'
+        return f"{parsed.scheme}://{parsed.netloc}{clean_path}"
+    return raw_url
 
 def expand_path(p: str | Path) -> Path:
     """Expands ~ and environment variables to an absolute Path."""
@@ -64,8 +85,8 @@ def load_settings() -> dict:
             print(f"[!] Warning: Failed to parse {config_file}: {e}", file=sys.stderr)
 
     # 1. ONEDRIVE_URL
-    url = os.environ.get("ONEDRIVE_URL") or file_cfg.get("onedrive_url", "")
-    if not url:
+    raw_url = os.environ.get("ONEDRIVE_URL") or file_cfg.get("onedrive_url", "")
+    if not raw_url:
         print("[!] Error: 'onedrive_url' is not configured.", file=sys.stderr)
         print("    Please run ./install.sh or edit ~/.config/onedrive_daemon/config.yaml", file=sys.stderr)
         send_notification(
@@ -74,6 +95,7 @@ def load_settings() -> dict:
             urgency="critical"
         )
         sys.exit(1)
+    url = normalize_onedrive_url(raw_url)
 
     # 2. REMOTE_NAME
     remote = os.environ.get("ONEDRIVE_REMOTE_NAME") or file_cfg.get("remote_name", "onedrive")

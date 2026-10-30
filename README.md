@@ -125,19 +125,25 @@ The installer will:
 
 ## Finding Your OneDrive / SharePoint URL
 
-To connect to your institutional or personal OneDrive:
+Modern OneDrive Online interfaces typically do not display the WebDAV folder structure directly in the address bar. Instead, retrieve the canonical URL via OneDrive's diagnostic settings:
 
-1. Open your web browser and log in to your Microsoft 365 or SharePoint portal.
-2. Navigate to **OneDrive** and click on **My files** (or open the document library).
-3. Look at your browser's address bar. Copy the URL starting with `https://` up to and including `/Documents`.
+1. Open your web browser and sign in to **OneDrive Online** (e.g. through your institution or Microsoft 365 portal).
+2. Click the **Settings gear icon** (⚙) in the top-right navigation header.
+3. Click **More settings** (or **OneDrive settings** &rarr; **More settings**).
+4. Scroll to the bottom of the page and click **Diagnostic information**.
+5. Copy the **OneDrive web URL** displayed there.
 
-**Example format:**
+**Example Diagnostic URL:**
 ```text
-https://<tenant>-my.sharepoint.com/personal/<username>_<tenant_domain>/Documents
+https://<tenant>-my.sharepoint.com/personal/<username>_<tenant_domain>/_layouts/15/onedrive.aspx
 ```
 
 *Example for UNC Chapel Hill:*
-`https://adminliveunc-my.sharepoint.com/personal/onyen_ad_unc_edu/Documents`
+`https://adminliveunc-my.sharepoint.com/personal/sweav_ad_unc_edu/_layouts/15/onedrive.aspx`
+
+> [!TIP]
+> You can paste the raw Diagnostic Information URL directly into `./install.sh`. The installer (and daemon) will automatically parse it and convert it into the required WebDAV documents endpoint:
+> `https://<tenant>-my.sharepoint.com/personal/<username>_<tenant_domain>/Documents`
 
 ---
 
