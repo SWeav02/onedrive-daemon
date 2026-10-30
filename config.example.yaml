@@ -26,3 +26,4 @@ browser_profile: "~/.config/onedrive_daemon/browser_profile"
 
 # [OPTIONAL] Path to the rclone configuration file (default: ~/.config/rclone/rclone.conf)
 rclone_conf: "~/.config/rclone/rclone.conf"
+

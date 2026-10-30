@@ -19,6 +19,22 @@ When accessing institutional or corporate Microsoft 365 OneDrive accounts protec
 
 ---
 
+### Why Standard Mounting Methods May Not Work
+
+Most Linux OneDrive guides instruct you to set up an rclone remote of type `onedrive` using Microsoft Graph API / Azure AD OAuth. In university or enterprise environments, this standard route often fails due to strict organization policies:
+
+- **Third-Party App Restrictions**: Many organizations disable user consent for third-party Azure AD enterprise applications. When trying to authenticate Rclone, you may encounter an *"Approval required"* or *"Need admin approval"* prompt blocking access.
+- **Conditional Access Policies (CAP)**: Enterprise policies may require Intune-managed / compliant devices or block non-browser OAuth user agents on Linux.
+- **Token Expiration Constraints**: Aggressive session lifetime and continuous access evaluation policies revoke headless refresh tokens.
+
+> [!TIP]
+> **Requesting IT Permissions:**
+> If your institution's IT department is responsive and willing to accommodate Linux workstations, you can request that they register a dedicated Enterprise Application for Rclone in Microsoft Entra (Azure AD) with `Files.ReadWrite.All` delegated permissions, or approve Rclone's default Client ID. Providing your IT team with a custom Client ID and Secret allows standard rclone Graph API mounts.
+
+When IT approval is unavailable or organizational policy restricts Graph API apps, **OneDrive Daemon** provides a reliable alternative: it uses SharePoint's native WebDAV endpoint coupled with an automated Playwright browser session. Because authentication occurs inside a genuine browser window (Firefox), it satisfies corporate Single Sign-On (SSO) and multi-factor prompts (Duo, Okta, Microsoft Authenticator) identically to logging in through the web portal.
+
+---
+
 ## Prerequisites
 
 Before running the installer, ensure the following system utilities are installed:
@@ -64,14 +80,11 @@ Choose either **uv** (recommended for speed) or standard Python **venv**:
 #### Option A: Using `uv` (Recommended)
 
 ```bash
-# Create virtual environment
-uv venv
+# Automatically create virtual environment and sync dependencies from pyproject.toml
+uv sync
 
 # Activate it
 source .venv/bin/activate
-
-# Install dependencies
-uv pip install -r requirements.txt
 ```
 
 #### Option B: Using standard `pip` and `venv`
@@ -242,3 +255,4 @@ rm -rf ~/.config/onedrive_daemon/browser_profile
 ## License
 
 MIT License. See [LICENSE](LICENSE) for details.
+
