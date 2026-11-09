@@ -23,8 +23,8 @@ remote_name: "onedrive"
 # [OPTIONAL] Local directory path where OneDrive will be mounted (default: ~/OneDrive)
 mount_point: "~/OneDrive"
 
-# [OPTIONAL] Seconds between health checks to monitor session validity (default: 900 = 15 minutes)
-check_interval_seconds: 900
+# [OPTIONAL] Seconds between health checks to monitor session validity (default: 120 = 2 minutes)
+check_interval_seconds: 120
 
 # [OPTIONAL] Directory for Playwright's persistent browser context (stores login cookies)
 browser_profile: "~/.config/onedrive_daemon/browser_profile"

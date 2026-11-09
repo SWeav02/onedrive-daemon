@@ -183,7 +183,7 @@ echo "======================================================================"
 CURRENT_URL=""
 CURRENT_REMOTE="onedrive"
 CURRENT_MOUNT="~/OneDrive"
-CURRENT_INTERVAL="900"
+CURRENT_INTERVAL="120"
 CURRENT_PROFILE="~/.config/onedrive_daemon/browser_profile"
 CURRENT_RCLONE="~/.config/rclone/rclone.conf"
 
@@ -255,7 +255,7 @@ while [ "$CONFIRM_SETTINGS" = false ]; do
 
     echo ""
     echo "--- Step 4: Health Check Interval ---"
-    echo "Seconds between background session checks (900 = 15 minutes)."
+    echo "Seconds between background session checks (120 = 2 minutes)."
     read -r -p "Check Interval in seconds [$CURRENT_INTERVAL]: " input_interval
     SELECTED_INTERVAL="${input_interval:-$CURRENT_INTERVAL}"
 

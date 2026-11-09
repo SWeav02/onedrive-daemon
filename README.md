@@ -14,8 +14,9 @@ When accessing institutional or corporate Microsoft 365 OneDrive accounts protec
 1. **Automated Rclone FUSE Mounting**: Mounts your OneDrive library to a local directory (default: `~/OneDrive`) with user permissions.
 2. **Headless & Interactive Watchdog**: Periodically verifies session validity against SharePoint.
 3. **MFA / SSO Token Refresh**: When tokens expire or are revoked, launches an interactive browser window via Playwright for you to complete MFA/SSO, extracts fresh `FedAuth`/`rtFa` session cookies, updates `rclone.conf`, and remounts seamlessly.
-4. **Desktop Notifications**: Sends native Linux desktop notifications via `notify-send` when authentication is required or when reconnection succeeds.
-5. **Systemd Integration**: Runs automatically on user login via a systemd user service.
+4. **Cross-Device Change & Conflict Protection**: Uses SharePoint-compatible WebDAV metadata queries (`vendor = sharepoint-ntlm` for `Depth: 0` file `PROPFIND`), 15-second directory/attribute cache refresh intervals, and a pre-mount VFS conflict check that automatically discards stale local cached copies if a newer version exists on OneDrive.
+5. **Desktop Notifications**: Sends native Linux desktop notifications via `notify-send` when authentication is required, reconnection succeeds, or a stale cache conflict is prevented.
+6. **Systemd Integration**: Runs automatically on user login via a systemd user service.
 
 ---
 
@@ -161,8 +162,8 @@ remote_name: "onedrive"
 # Local folder path where OneDrive will be mounted (default: ~/OneDrive)
 mount_point: "~/OneDrive"
 
-# Seconds between token health checks (default: 900 = 15 minutes)
-check_interval_seconds: 900
+# Seconds between token health checks (default: 120 = 2 minutes)
+check_interval_seconds: 120
 
 # Persistent browser profile location for saved authentication
 browser_profile: "~/.config/onedrive_daemon/browser_profile"
