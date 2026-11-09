@@ -19,6 +19,8 @@ CONFIGURATION:
 """
 
 import configparser
+from datetime import datetime, timedelta, timezone
+import json
 import os
 import re
 import signal
@@ -105,11 +107,11 @@ def load_settings() -> dict:
     mount_point = expand_path(raw_mount)
 
     # 4. CHECK_INTERVAL_SECONDS
-    raw_interval = os.environ.get("ONEDRIVE_CHECK_INTERVAL") or file_cfg.get("check_interval_seconds", 900)
+    raw_interval = os.environ.get("ONEDRIVE_CHECK_INTERVAL") or file_cfg.get("check_interval_seconds", 120)
     try:
         check_interval = int(raw_interval)
     except ValueError:
-        check_interval = 900
+        check_interval = 120
 
     # 5. BROWSER_PROFILE
     raw_profile = (
@@ -219,7 +221,7 @@ def refresh_cookies():
 
     config.set(REMOTE_NAME, "type", "webdav")
     config.set(REMOTE_NAME, "url", ONEDRIVE_URL)
-    config.set(REMOTE_NAME, "vendor", "other")
+    config.set(REMOTE_NAME, "vendor", "sharepoint-ntlm")
     config.set(REMOTE_NAME, "headers", f'"Cookie","{cookie_val}"')
 
     with open(RCLONE_CONF, "w") as f:
@@ -227,6 +229,124 @@ def refresh_cookies():
 
     print("[+] Successfully updated rclone.conf with fresh session tokens.")
     send_notification("OneDrive Connected", "Credentials successfully refreshed.", "normal")
+
+
+def ensure_rclone_vendor():
+    """Ensures rclone.conf uses vendor=sharepoint-ntlm so PROPFIND uses Depth:0 on files."""
+    if not RCLONE_CONF.exists():
+        return
+    config = configparser.ConfigParser()
+    config.read(RCLONE_CONF)
+    if config.has_section(REMOTE_NAME):
+        current_vendor = config.get(REMOTE_NAME, "vendor", fallback="")
+        if current_vendor != "sharepoint-ntlm":
+            config.set(REMOTE_NAME, "vendor", "sharepoint-ntlm")
+            with open(RCLONE_CONF, "w") as f:
+                config.write(f, space_around_delimiters=False)
+            print(f"[+] Updated rclone vendor from '{current_vendor}' to 'sharepoint-ntlm' in {RCLONE_CONF}")
+
+
+def parse_iso_timestamp(ts_str: str) -> datetime | None:
+    """Parses an RFC3339/ISO-8601 timestamp string (including nanoseconds) into a UTC datetime."""
+    if not ts_str:
+        return None
+    try:
+        s = ts_str.strip()
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+        # Python 3.11+ handles arbitrary fractional digits; normalize for older 3.10 if needed
+        match = re.match(r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d+))?([+-]\d{2}:\d{2})$", s)
+        if match:
+            base, frac, tz = match.groups()
+            frac6 = (frac or "").ljust(6, "0")[:6]
+            s = f"{base}.{frac6}{tz}"
+        return datetime.fromisoformat(s).astimezone(timezone.utc)
+    except Exception:
+        return None
+
+
+def get_rclone_vfs_dirs() -> tuple[Path, Path]:
+    """Returns the (vfs_dir, vfs_meta_dir) paths for the configured remote."""
+    cache_root = Path(os.environ.get("XDG_CACHE_HOME", Path.home() / ".cache")) / "rclone"
+    return cache_root / "vfs" / REMOTE_NAME, cache_root / "vfsMeta" / REMOTE_NAME
+
+
+def resolve_vfs_conflicts():
+    """
+    Scans rclone's local VFS cache for dirty files before mounting.
+    If the remote file on OneDrive has a newer modification timestamp than the
+    locally cached dirty copy, discards the older local cached copy so it never
+    overwrites newer remote changes.
+    """
+    vfs_dir, vfs_meta_dir = get_rclone_vfs_dirs()
+    if not vfs_meta_dir.is_dir():
+        return
+
+    discarded = []
+    for meta_path in list(vfs_meta_dir.rglob("*")):
+        if not meta_path.is_file():
+            continue
+        try:
+            with open(meta_path, "r") as f:
+                meta = json.load(f)
+        except Exception:
+            continue
+
+        if not meta.get("Dirty"):
+            continue
+
+        local_mtime = parse_iso_timestamp(meta.get("ModTime", ""))
+        if not local_mtime:
+            continue
+
+        rel_path = meta_path.relative_to(vfs_meta_dir).as_posix()
+        res = subprocess.run(
+            ["rclone", "lsjson", f"{REMOTE_NAME}:{rel_path}"],
+            capture_output=True,
+            text=True
+        )
+        if res.returncode != 0 or not res.stdout.strip():
+            continue
+
+        try:
+            items = json.loads(res.stdout)
+        except Exception:
+            continue
+
+        if not items or not isinstance(items, list):
+            continue
+
+        remote_mtime = parse_iso_timestamp(items[0].get("ModTime", ""))
+        if not remote_mtime:
+            continue
+
+        # Allow 2 seconds tolerance for sub-second truncation on WebDAV Last-Modified
+        if remote_mtime > local_mtime + timedelta(seconds=2):
+            data_path = vfs_dir / rel_path
+            print(
+                f"[!] Conflict detected for '{rel_path}': "
+                f"remote ({remote_mtime.isoformat()}) is newer than cached local copy ({local_mtime.isoformat()}). "
+                f"Discarding older local cached copy."
+            )
+            try:
+                meta_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            try:
+                data_path.unlink(missing_ok=True)
+            except OSError:
+                pass
+            discarded.append(rel_path)
+
+    if discarded:
+        summary_list = ", ".join(Path(p).name for p in discarded[:3])
+        if len(discarded) > 3:
+            summary_list += f" (+{len(discarded) - 3} more)"
+        send_notification(
+            "OneDrive Conflict Prevented",
+            f"Discarded older cached copy for newer remote file(s): {summary_list}",
+            urgency="normal"
+        )
 
 
 def unmount_drive():
@@ -245,9 +365,16 @@ def start_mount_process() -> subprocess.Popen:
     subprocess.run(["pkill", "-f", f"rclone mount {REMOTE_NAME}:"], capture_output=True)
     time.sleep(0.5)
 
+    ensure_rclone_vendor()
+    resolve_vfs_conflicts()
+
     cmd = [
         "rclone", "mount", f"{REMOTE_NAME}:", str(MOUNT_POINT),
         "--vfs-cache-mode", "writes",
+        "--dir-cache-time", "15s",
+        "--attr-timeout", "15s",
+        "--vfs-cache-max-age", "15s",
+        "--vfs-write-back", "2s",
         "--allow-other",
         "--uid", str(os.getuid()),
         "--gid", str(os.getgid()),
@@ -277,6 +404,8 @@ def main():
 
     signal.signal(signal.SIGINT, handle_exit)
     signal.signal(signal.SIGTERM, handle_exit)
+
+    ensure_rclone_vendor()
 
     # Initial boot check: refresh if needed
     if not is_authenticated():
